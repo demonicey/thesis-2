@@ -1,0 +1,32 @@
+# macOS
+.DS_Store
+
+# Android Studio
+.idea/
+
+# Android build files
+*.apk
+*.aar
+*.o
+*.so
+
+# Gradle
+.gradle/
+build/
+gradle-app.setting
+!gradle-wrapper.jar
+
+# IntelliJ IDEA
+*.iml
+
+# VSCode
+.vscode/
+
+# Node modules if any
+node_modules/
+
+# Firebase config if sensitive
+# google-services.json
+
+# Other
+*.log

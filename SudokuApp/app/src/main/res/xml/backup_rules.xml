@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <!-- TODO: Use <include> and <exclude> tags if needed.
+    <include domain="file" path="."/>
+    <exclude domain="file" path="cache/"/>
+    -->
+</full-backup-content>
