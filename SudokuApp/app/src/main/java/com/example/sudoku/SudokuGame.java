@@ -4,6 +4,7 @@ import java.util.Random;
 
 public class SudokuGame {
     private int[][] board = new int[9][9];
+    private int[][] originalBoard = new int[9][9];
 
     public SudokuGame() {
         generatePuzzle();
@@ -18,6 +19,8 @@ public class SudokuGame {
         solveSudoku(0, 0);
         // Remove some numbers for puzzle
         removeNumbers(40); // Remove 40 numbers for easy puzzle
+        // Copy to original board
+        copyBoard(board, originalBoard);
     }
 
     private void clearBoard() {
@@ -104,6 +107,16 @@ public class SudokuGame {
 
     public int[][] getBoard() {
         return board;
+    }
+
+    public int[][] getOriginalBoard() {
+        return originalBoard;
+    }
+
+    private void copyBoard(int[][] source, int[][] dest) {
+        for (int i = 0; i < 9; i++) {
+            System.arraycopy(source[i], 0, dest[i], 0, 9);
+        }
     }
 
     public boolean isSolved() {
