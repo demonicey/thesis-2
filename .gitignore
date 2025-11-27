@@ -44,3 +44,6 @@ sudoku_database-wal
 
 # Test compilation artifacts
 SudokuApp/TestCrypto.class
+
+# Java heap dump files
+*.hprof
