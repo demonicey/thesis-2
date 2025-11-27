@@ -33,7 +33,10 @@ import javax.crypto.spec.SecretKeySpec;
 public class CryptoHelper {
     private static final String KEY_ALIAS = "sudoku_location_key";
     private static final String AES_TRANSFORMATION = "AES/GCM/NoPadding";
-    private static final int AES_KEY_SIZE = 256;
+
+    // AES key size in bits for symmetric encryption
+    private static final int AES_KEY_SIZE = 128;
+
     private static final int GCM_TAG_LENGTH = 128;
     private KeyStore keyStore;
     private SecretKey aesKey;
@@ -52,6 +55,7 @@ public class CryptoHelper {
                 KeyGenParameterSpec keyGenParameterSpec = new KeyGenParameterSpec.Builder(KEY_ALIAS,
                         KeyProperties.PURPOSE_AGREE_KEY)
                         .setAlgorithmParameterSpec(new ECGenParameterSpec("secp256r1"))
+                        // EC key size in bits for Elliptic Curve key agreement (ECDH)
                         .setKeySize(256)
                         .build();
                 keyPairGenerator.initialize(keyGenParameterSpec);

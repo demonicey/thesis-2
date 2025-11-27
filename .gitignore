@@ -30,3 +30,17 @@ node_modules/
 
 # Other
 *.log
+
+# Database files
+*.db
+*.db-shm
+*.db-wal
+sudoku_database
+sudoku_database-shm
+sudoku_database-wal
+
+# Compiled class files
+*.class
+
+# Test compilation artifacts
+SudokuApp/TestCrypto.class
