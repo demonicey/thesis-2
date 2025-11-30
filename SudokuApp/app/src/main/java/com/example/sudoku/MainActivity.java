@@ -4,6 +4,7 @@ import android.Manifest;
 import android.content.pm.PackageManager;
 import android.location.Location;
 import android.os.Bundle;
+import android.os.CancellationSignal;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.GridLayout;
@@ -15,7 +16,11 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 
 import com.google.android.gms.location.FusedLocationProviderClient;
+import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.tasks.CancellationToken;
+import com.google.android.gms.tasks.OnTokenCanceledListener;
+
 
 import okhttp3.Call;
 import okhttp3.Callback;
@@ -25,10 +30,14 @@ import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
 
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+
 import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.IOException;
+import java.security.GeneralSecurityException;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.UnrecoverableEntryException;
@@ -54,6 +63,7 @@ public class MainActivity extends AppCompatActivity {
     private Location currentLocation;
     private int score = 0;
     private int locationBonus = 0;
+    private DatabaseReference firebaseDatabase;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -71,18 +81,25 @@ public class MainActivity extends AppCompatActivity {
 
         // Initialize game and services
         sudokuGame = new SudokuGame();
-        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
+        try {
+            fusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
+        } catch (Exception e) {
+            fusedLocationClient = null;
+            Toast.makeText(this, "Location services initialization failed: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+        }
         databaseHelper = DatabaseHelper.getDatabase(this);
         httpClient = new OkHttpClient();
         try {
-            cryptoHelper = new CryptoHelper(this);
-        } catch (KeyStoreException | CertificateException | NoSuchAlgorithmException | IOException | java.security.UnrecoverableKeyException e) {
-            Toast.makeText(this, "Failed to initialize crypto: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            firebaseDatabase = FirebaseDatabase.getInstance().getReference();
+        } catch (Exception e) {
+            firebaseDatabase = null;
+            Toast.makeText(this, "Firebase initialization failed: " + e.getMessage(), Toast.LENGTH_SHORT).show();
         }
+        cryptoHelper = new CryptoHelper(this);
 
         // Request location permission
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, 1);
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION}, 1);
         } else {
             getLocation();
         }
@@ -106,6 +123,15 @@ public class MainActivity extends AppCompatActivity {
                 cell.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
                 cell.setMaxLines(1);
                 cell.setTag(i * 9 + j);
+                cell.setGravity(android.view.Gravity.CENTER);
+                cell.setTextSize(18);
+                cell.setPadding(4, 4, 4, 4);
+                GridLayout.LayoutParams params = new GridLayout.LayoutParams();
+                params.width = 0;
+                params.height = GridLayout.LayoutParams.WRAP_CONTENT;
+                params.columnSpec = GridLayout.spec(j, 1, 1f);
+                params.rowSpec = GridLayout.spec(i, 1, 1f);
+                cell.setLayoutParams(params);
                 cell.addTextChangedListener(new android.text.TextWatcher() {
                     @Override
                     public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
@@ -157,8 +183,23 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void getLocation() {
+        if (fusedLocationClient == null) {
+            tvLocation.setText("Location: Service not available");
+            return; // Early exit if location client failed to initialize
+        }
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-            fusedLocationClient.getLastLocation().addOnSuccessListener(this, location -> {
+            fusedLocationClient.getCurrentLocation(LocationRequest.PRIORITY_HIGH_ACCURACY, new CancellationToken() {
+                @Override
+                public boolean isCancellationRequested() {
+                    return false;
+                }
+
+                @NonNull
+                @Override
+                public CancellationToken onCanceledRequested(@NonNull OnTokenCanceledListener onTokenCanceledListener) {
+                    return null;
+                }
+            }).addOnSuccessListener(this, location -> {
                 if (location != null) {
                     currentLocation = location;
                     tvLocation.setText("Location: " + location.getLatitude() + ", " + location.getLongitude());
@@ -168,8 +209,17 @@ public class MainActivity extends AppCompatActivity {
                         updateScore();
                         Toast.makeText(this, "Bonus location! +50 points", Toast.LENGTH_SHORT).show();
                     }
+                } else {
+                    tvLocation.setText("Location: Not available");
+                    Toast.makeText(this, "Unable to get current location. Ensure location is enabled on your device.", Toast.LENGTH_SHORT).show();
                 }
+            }).addOnFailureListener(this, e -> {
+                tvLocation.setText("Location: Error");
+                Toast.makeText(this, "Location error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
             });
+        } else {
+            tvLocation.setText("Location: Permission denied");
+            Toast.makeText(this, "Location permission not granted", Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -187,84 +237,58 @@ public class MainActivity extends AppCompatActivity {
             try {
                 String locationData = currentLocation.getLatitude() + "," + currentLocation.getLongitude();
                 String encryptedLocation = cryptoHelper != null ? cryptoHelper.encrypt(locationData) : locationData;
-                UserRecord record = new UserRecord("user123", score, encryptedLocation, System.currentTimeMillis());
+                String encryptedUserId = cryptoHelper != null ? cryptoHelper.encrypt("user123") : "user123";
+                String encryptedScore = cryptoHelper != null ? cryptoHelper.encrypt(String.valueOf(score)) : String.valueOf(score);
+                String encryptedTimestamp = cryptoHelper != null ? cryptoHelper.encrypt(String.valueOf(System.currentTimeMillis())) : String.valueOf(System.currentTimeMillis());
+                UserRecord record = new UserRecord(encryptedUserId, encryptedScore, encryptedLocation, encryptedTimestamp);
                 new Thread(() -> {
                     databaseHelper.userRecordDao().insert(record);
                     runOnUiThread(() -> Toast.makeText(this, "Score saved locally!", Toast.LENGTH_SHORT).show());
                 }).start();
-            } catch (Exception e) {
-                // Fallback to unencrypted data
-                String locationData = currentLocation.getLatitude() + "," + currentLocation.getLongitude();
-                UserRecord record = new UserRecord("user123", score, locationData, System.currentTimeMillis());
-                new Thread(() -> {
-                    databaseHelper.userRecordDao().insert(record);
-                    runOnUiThread(() -> Toast.makeText(this, "Score saved locally (unencrypted)!", Toast.LENGTH_SHORT).show());
-                }).start();
+            } catch (GeneralSecurityException e) {
+                runOnUiThread(() -> Toast.makeText(this, "Failed to encrypt data. Score not saved.", Toast.LENGTH_SHORT).show());
             }
         } else {
-            Toast.makeText(this, "Location not available", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Location not available for score submission", Toast.LENGTH_SHORT).show();
         }
     }
 
     private void simulateSync() {
-        double lat, lon;
-        if (currentLocation != null) {
-            lat = currentLocation.getLatitude();
-            lon = currentLocation.getLongitude();
-        } else {
-            // Hardcoded values for simulation (Klaipeda University approx.)
-            lat = 55.7033;
-            lon = 21.1443;
-        }
-
-        try {
-            String locationData = lat + "," + lon;
-            String encryptedLocation = "";
-            if (cryptoHelper != null) {
-                encryptedLocation = cryptoHelper.encrypt(locationData);
-            } else {
-                encryptedLocation = locationData; // Fallback if crypto fails
+        new Thread(() -> {
+            try {
+                List<UserRecord> records = databaseHelper.userRecordDao().getAllRecords();
+                if (records.isEmpty()) {
+                    runOnUiThread(() -> Toast.makeText(MainActivity.this, "No local records to sync", Toast.LENGTH_SHORT).show());
+                    return;
+                }
+                for (UserRecord record : records) {
+                    if (firebaseDatabase != null) {
+                        firebaseDatabase.child("userRecords").child(String.valueOf(record.id)).setValue(record)
+                                .addOnSuccessListener(aVoid -> {
+                                    // Handle success if needed
+                                })
+                                .addOnFailureListener(e -> {
+                                    runOnUiThread(() -> Toast.makeText(MainActivity.this, "Sync failed: " + e.getMessage(), Toast.LENGTH_SHORT).show());
+                                });
+                    }
+                }
+                runOnUiThread(() -> Toast.makeText(MainActivity.this, "Sync to Firebase completed!", Toast.LENGTH_SHORT).show());
+            } catch (Exception e) {
+                runOnUiThread(() -> Toast.makeText(MainActivity.this, "Sync error: " + e.getMessage(), Toast.LENGTH_SHORT).show());
             }
-
-            JSONObject json = new JSONObject();
-            json.put("userId", "user123");
-            json.put("score", score);
-            json.put("encryptedLocation", encryptedLocation);
-            json.put("timestamp", System.currentTimeMillis());
-
-            RequestBody body = RequestBody.create(json.toString(), MediaType.parse("application/json; charset=utf-8"));
-            Request request = new Request.Builder()
-                    .url("https://httpbin.org/post") // Mock API endpoint for testing
-                    .post(body)
-                    .build();
-
-            httpClient.newCall(request).enqueue(new Callback() {
-                @Override
-                public void onFailure(Call call, IOException e) {
-                    runOnUiThread(() -> Toast.makeText(MainActivity.this, "Sync failed: " + e.getMessage(), Toast.LENGTH_SHORT).show());
-                }
-
-                @Override
-                public void onResponse(Call call, Response response) throws IOException {
-                    runOnUiThread(() -> {
-                        if (response.isSuccessful()) {
-                            Toast.makeText(MainActivity.this, "Sync simulated successfully!", Toast.LENGTH_SHORT).show();
-                        } else {
-                            Toast.makeText(MainActivity.this, "Sync failed: " + response.code(), Toast.LENGTH_SHORT).show();
-                        }
-                    });
-                }
-            });
-        } catch (Exception e) {
-            Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-        }
+        }).start();
     }
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == 1 && grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-            getLocation();
+        if (requestCode == 1) {
+            if (grantResults.length > 0 && (grantResults[0] == PackageManager.PERMISSION_GRANTED || (grantResults.length > 1 && grantResults[1] == PackageManager.PERMISSION_GRANTED))) {
+                getLocation();
+            } else {
+                tvLocation.setText("Location: Permission denied");
+                Toast.makeText(this, "Location permission denied by user.", Toast.LENGTH_SHORT).show();
+            }
         }
     }
 }

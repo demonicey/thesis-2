@@ -1,10 +1,14 @@
 package com.example.sudoku;
 
 import android.content.Context;
-import androidx.test.platform.app.InstrumentationRegistry;
+import androidx.test.core.app.ApplicationProvider;
 import org.junit.Test;
 import org.junit.Before;
+import org.junit.runner.RunWith;
+import org.robolectric.RobolectricTestRunner;
 import static org.junit.Assert.*;
+
+@RunWith(RobolectricTestRunner.class)
 
 public class CryptoHelperTest {
 
@@ -12,8 +16,8 @@ public class CryptoHelperTest {
 
     @Before
     public void setUp() throws Exception {
-        Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
-        cryptoHelper = new CryptoHelper(context);
+        // Use test mode to avoid Android KeyStore issues in unit tests
+        cryptoHelper = new CryptoHelper(true);
     }
 
     @Test

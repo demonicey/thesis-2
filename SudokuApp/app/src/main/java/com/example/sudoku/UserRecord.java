@@ -3,23 +3,25 @@ package com.example.sudoku;
 import android.widget.Toast;
 import android.content.Context;
 import androidx.room.Entity;
+import androidx.room.Ignore;
 import androidx.room.PrimaryKey;
 
 @Entity(tableName = "userrecord")
 public class UserRecord {
     @PrimaryKey(autoGenerate = true)
     public int id;
-    public String userId;
-    public int score;
+    public String encryptedUserId;
+    public String encryptedScore;
     public String encryptedLocation;
-    public long timestamp;
+    public String encryptedTimestamp;
 
     public UserRecord() {}
 
-    public UserRecord(String userId, int score, String encryptedLocation, long timestamp) {
-        this.userId = userId;
-        this.score = score;
+    @Ignore
+    public UserRecord(String encryptedUserId, String encryptedScore, String encryptedLocation, String encryptedTimestamp) {
+        this.encryptedUserId = encryptedUserId;
+        this.encryptedScore = encryptedScore;
         this.encryptedLocation = encryptedLocation;
-        this.timestamp = timestamp;
+        this.encryptedTimestamp = encryptedTimestamp;
     }
 }

@@ -5,7 +5,7 @@ import androidx.room.Room;
 import androidx.room.RoomDatabase;
 import android.content.Context;
 
-@Database(entities = {UserRecord.class}, version = 1, exportSchema = false)
+@Database(entities = {UserRecord.class}, version = 2, exportSchema = false)
 public abstract class DatabaseHelper extends RoomDatabase {
     public abstract UserRecordDao userRecordDao();
 
@@ -16,7 +16,8 @@ public abstract class DatabaseHelper extends RoomDatabase {
             synchronized (DatabaseHelper.class) {
                 if (INSTANCE == null) {
                     INSTANCE = Room.databaseBuilder(context.getApplicationContext(),
-                            DatabaseHelper.class, "sudoku_database")
+                            DatabaseHelper.class, "sudoku_database_v2")
+                            .fallbackToDestructiveMigration()
                             .build();
                 }
             }

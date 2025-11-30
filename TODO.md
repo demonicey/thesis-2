@@ -1,10 +1,10 @@
-- [x] Remove Firebase dependencies from app/build.gradle
-- [x] Remove google-services plugin from app/build.gradle
-- [x] Delete google-services.json
-- [x] Create DatabaseHelper.java using Room for local storage
-- [x] Create UserRecordDao.java for database operations
-- [x] Convert FirebaseHelper.java to UserRecord.java entity
-- [x] Update MainActivity.java to remove Firebase initialization and use DatabaseHelper
-- [x] Update submitScore to save locally and optionally sync to mock API
-- [x] Update CryptoHelper.java to use EC 256-bit keys with AES-GCM encryption
+# TODO List for Sudoku App Encryption and Sync Updates
+
+## Completed Tasks
+- [x] Updated UserRecord.java to encrypt all fields (userId, score, location, timestamp)
+- [x] Modified MainActivity.java submitScore method to encrypt all data before local storage
+- [x] Updated UserRecordDao.java queries to use encrypted field names
+- [x] Changed simulateSync method to use Firebase for syncing instead of mock API
+
+## Summary
 - [x] Build and test the app
